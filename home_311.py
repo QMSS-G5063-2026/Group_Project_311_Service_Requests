@@ -56,7 +56,7 @@ st.divider()
 # ─────────────────────────────────────────────
 # LOAD DATA (same file used everywhere)
 # ─────────────────────────────────────────────
-df = pd.read_csv("NYC_311_Master_2024_2025.csv")
+df = load_data()
 
 # ─────────────────────────────────────────────
 # DATA TABULAR PREVIEW
