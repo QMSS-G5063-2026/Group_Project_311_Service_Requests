@@ -1,6 +1,16 @@
 import streamlit as st
-import pandas as pd
+from data_loader import load_data
 
+
+st.set_page_config(
+    page_title="NYC 311 Explorer",
+    page_icon="🏙️",
+    layout="wide"
+)
+
+# ─────────────────────────────────────────────
+# HEADER
+# ─────────────────────────────────────────────
 st.markdown("""
 <div style="
     background: linear-gradient(90deg, #1f77b4, #4aa3df);
@@ -22,12 +32,49 @@ st.markdown("""
     </p>
 </div>
 """, unsafe_allow_html=True)
+st.divider()
 
-df = pd.read_csv("NYC_311_Master_2024_2025.csv")
+# ─────────────────────────────────────────────
+# INTRO SECTION
+# ─────────────────────────────────────────────
+st.subheader("📊 Explore the Dashboard")
 
-st.write(df)
+st.markdown("""
+This project analyzes NYC 311 complaints to uncover:
+- Spatial patterns across boroughs
+- Trends over time
+- Most common complaint types
+- Neighborhood-level differences
+""")
 
-col1, col2 = st.columns(2)
+st.divider()
 
-col1.metric("Rows", df.shape[0])
-col2.metric("Columns", df.shape[1])
+# ─────────────────────────────────────────────
+# NAVIGATION (SAFE VERSION)
+# ─────────────────────────────────────────────
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.markdown("### 🗺️ Map Analysis")
+    st.markdown("Visualize where complaints occur across NYC.")
+    if st.button("Open Map"):
+        st.switch_page("map_311.py")
+
+with col2:
+    st.markdown("### 📈 Time Trends")
+    st.markdown("Track how complaints change over time.")
+    if st.button("Open Trends"):
+        st.switch_page("trends_311.py")
+
+with col3:
+    st.markdown("### ☁️ Word Insights")
+    st.markdown("Explore complaint text patterns by borough.")
+    if st.button("Open Word Cloud"):
+        st.switch_page("wordcloud_311.py")
+
+st.divider()
+
+# ─────────────────────────────────────────────
+# FOOTER METRICS PLACEHOLDER (OPTIONAL)
+# ─────────────────────────────────────────────
+st.caption("NYC 311 Data Explorer | Streamlit Dashboard Project 2026")
