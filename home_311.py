@@ -85,11 +85,6 @@ col4.metric("Complaint Types", df["Main Complaint Category"].nunique())
 with st.expander("📋 View Column Names"):
     st.write(list(df.columns))
 
-st.write("CURRENT DIR:", os.getcwd())
-st.write("PAGES CONTENT:", os.listdir("pages"))
-
-
-
 
 # ─────────────────────────────────────────────
 # FOOTER METRICS PLACEHOLDER (OPTIONAL)
