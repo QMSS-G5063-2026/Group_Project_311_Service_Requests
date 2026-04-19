@@ -1,6 +1,7 @@
 import streamlit as st
 from data_loader import load_data
 import os
+import pandas as pd
 
 st.set_page_config(
     page_title="NYC 311 Explorer",
@@ -47,16 +48,52 @@ Use the sidebar (←) to navigate between:
 """)
 
 st.divider()
+
+# ─────────────────────────────────────────────
+# data tabular
+# ─────────────────────────────────────────────
+
+# ─────────────────────────────────────────────
+# LOAD DATA (same file used everywhere)
+# ─────────────────────────────────────────────
+df = pd.read_csv("NYC_311_Master_2024_2025.csv")
+
+# ─────────────────────────────────────────────
+# DATA TABULAR PREVIEW
+# ─────────────────────────────────────────────
+st.subheader("📊 Data Preview")
+
+st.write("First 10 rows of NYC 311 dataset:")
+
+st.dataframe(df.head(10), use_container_width=True)
+
+# ─────────────────────────────────────────────
+# DATA INFO METRICS
+# ─────────────────────────────────────────────
+st.subheader("📌 Dataset Overview")
+
+col1, col2, col3, col4 = st.columns(4)
+
+col1.metric("Total Rows", f"{len(df):,}")
+col2.metric("Columns", df.shape[1])
+col3.metric("Boroughs", df["Borough"].nunique())
+col4.metric("Complaint Types", df["Main Complaint Category"].nunique())
+
+# ─────────────────────────────────────────────
+# OPTIONAL: COLUMN LIST
+# ─────────────────────────────────────────────
+with st.expander("📋 View Column Names"):
+    st.write(list(df.columns))
+
 st.write("CURRENT DIR:", os.getcwd())
 st.write("PAGES CONTENT:", os.listdir("pages"))
 
-# ─────────────────────────────────────────────
-# NAVIGATION (SAFE VERSION)
-# ─────────────────────────────────────────────
+
 
 
 # ─────────────────────────────────────────────
 # FOOTER METRICS PLACEHOLDER (OPTIONAL)
 # ─────────────────────────────────────────────
 st.caption("NYC 311 Data Explorer | Streamlit Dashboard Project 2026")
+
 
