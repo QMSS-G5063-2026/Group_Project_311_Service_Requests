@@ -1,81 +1,69 @@
 import streamlit as st
 import pandas as pd
-import pydeck as pdk
+import folium
+from folium.plugins import MarkerCluster
+from streamlit_folium import st_folium
 from data_loader import load_data
 
 st.set_page_config(layout="wide", page_title="NYC 311 Geospatial Lead")
 
-# Access Shared Data (Cached for speed)
+# Loading the Shared Data
 df = load_data()
 
-# Sidebar Filters
+# Sidebar Filters (Maintains sync with teammates)
 st.sidebar.header("📍 Map Controls")
+hoods = ["All"] + sorted(df['Neighborhood'].unique().tolist())
+selected_hood = st.sidebar.selectbox("Search Neighborhood", hoods)
 
-# Neighborhood Filter
-neighborhoods = ["All"] + sorted(df['Neighborhood'].unique().tolist())
-selected_hood = st.sidebar.selectbox("Search Neighborhood", neighborhoods)
+complaints = ["All"] + sorted(df['Complaint'].unique().tolist())
+selected_complaint = st.sidebar.selectbox("Complaint Type", complaints)
 
-# ZIP Code Filter
-zips = ["All"] + sorted(df['Incident Zip'].unique().tolist())
-selected_zip = st.sidebar.selectbox("Search ZIP Code", zips)
-
-# Complaint Category Filter
-categories = ["All"] + sorted(df['Complaint'].unique().tolist())
-selected_complaint = st.sidebar.selectbox("Complaint Type", categories)
-
-# Global State Triggers (Syncs all the pages)
-st.session_state['global_zip'] = selected_zip
+# Updates session state for teammates
 st.session_state['global_hood'] = selected_hood
 st.session_state['global_complaint'] = selected_complaint
 
-# Filter Logic
+# Filtering the data
 map_df = df.copy()
 if selected_hood != "All":
     map_df = map_df[map_df['Neighborhood'] == selected_hood]
-if selected_zip != "All":
-    map_df = map_df[map_df['Incident Zip'] == selected_zip]
 if selected_complaint != "All":
     map_df = map_df[map_df['Complaint'] == selected_complaint]
 
-# Dynamic Camera Centering
-# Centering on the selected neighborhood or defaults to NYC
-if not map_df.empty:
-    center_lat = map_df['Latitude'].mean()
-    center_lon = map_df['Longitude'].mean()
-    zoom_level = 13.5 if selected_hood != "All" else 10
+# Professional Map Logic
+st.title(f"311 Service Requests: {selected_hood if selected_hood != 'All' else 'Citywide'}")
+
+# Limiting data for Folium to keep it smooth (Folium handles ~10k-20k points best)
+# Taking the most recent requests if the list is too long
+if len(map_df) > 10000:
+    display_df = map_df.head(10000)
+    st.warning("⚠️ Showing the 10,000 most recent records for performance.")
 else:
-    center_lat, center_lon, zoom_level = 40.7128, -74.0060, 10
+    display_df = map_df
 
-view_state = pdk.ViewState(
-    latitude=center_lat,
-    longitude=center_lon,
-    zoom=zoom_level,
-    pitch=40,   # Slight angle for 3D effect without "sticks"
-    bearing=0
-)
+if not display_df.empty:
+    avg_lat = display_df['Latitude'].mean()
+    avg_lon = display_df['Longitude'].mean()
+    
+    # Creating the Flat Map (Professional Light Style)
+    m = folium.Map(location=[avg_lat, avg_lon], zoom_start=13, tiles="CartoDB positron")
 
-# Map Layer Definition
-hexagon_layer = pdk.Layer(
-    "HexagonLayer",
-    data=map_df,
-    get_position='[Longitude, Latitude]',
-    radius=70,           # Optimized radius for neighborhood detail
-    elevation_scale=10,  # Balanced height for 2.8M rows
-    elevation_range=[0, 1000],
-    pickable=True,
-    extruded=True,       
-    color_range=[[255,255,178], [254,217,118], [254,178,76], [253,141,60], [240,59,32], [189,0,38]]
-)
+    # Adding the "Professional Cluster" layer
+    marker_cluster = MarkerCluster(name="311 Complaints").add_to(m)
 
-# Render
-st.title(f"311 Clusters: {selected_hood if selected_hood != 'All' else 'NYC Citywide'}")
+    # Adding points to cluster
+    for idx, row in display_df.iterrows():
+        folium.CircleMarker(
+            location=[row['Latitude'], row['Longitude']],
+            radius=5,
+            popup=f"<b>Type:</b> {row['Complaint']}<br><b>Detail:</b> {row['Complaint Detail']}",
+            color="#6a0dad", # Professional Purple
+            fill=True,
+            fill_color="#6a0dad"
+        ).add_to(marker_cluster)
 
-st.pydeck_chart(pdk.Deck(
-    map_style='mapbox://styles/mapbox/dark-v9',
-    initial_view_state=view_state,
-    layers=[hexagon_layer],
-    tooltip={"text": "Complaints in Cluster: {elevationValue}"}
-))
+    # Rendering
+    st_folium(m, width=1400, height=700, use_container_width=True)
+else:
+    st.error("No data found for this selection.")
 
-# Status Message
-st.info(f"Showing {len(map_df):,} incidents. Your teammates' pages are now synced to this selection.")
+st.info(f"Total records in this view: {len(display_df):,}")
