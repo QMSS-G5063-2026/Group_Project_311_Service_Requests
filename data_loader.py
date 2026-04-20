@@ -20,5 +20,11 @@ def load_data():
     
     # Cleaning Neighborhoods (Ensures drop-down is clean)
     df = df.dropna(subset=["Neighborhood"])
+
+    # Optimizing memory by converting objects to categories and floats to 32-bit
+    df['Borough'] = df['Borough'].astype('category')
+    df['Neighborhood'] = df['Neighborhood'].astype('category')
+    df['Latitude'] = df['Latitude'].astype('float32')
+    df['Longitude'] = df['Longitude'].astype('float32')
     
     return df
