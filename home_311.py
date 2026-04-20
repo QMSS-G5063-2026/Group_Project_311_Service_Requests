@@ -77,7 +77,7 @@ col1, col2, col3, col4 = st.columns(4)
 col1.metric("Total Rows", f"{len(df):,}")
 col2.metric("Columns", df.shape[1])
 col3.metric("Boroughs", df["Borough"].nunique())
-col4.metric("Complaint Types", df["Main Complaint Category"].nunique())
+col4.metric("Complaint Types", df["Complaint"].nunique())
 
 # ─────────────────────────────────────────────
 # OPTIONAL: COLUMN LIST
