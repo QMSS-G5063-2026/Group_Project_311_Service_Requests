@@ -11,23 +11,21 @@ st.title("📈 NYC 311 Complaints Over Time (Manhattan 2025)")
 # LOAD DATA
 # ─────────────────────────────────────────────
 df = load_data()
+
 # ─────────────────────────────────────────────
 # CLEAN ZIP CODES
 # ─────────────────────────────────────────────
-
 df["Incident Zip"] = df["Incident Zip"].astype(str)
 
-# remove bad ZIPs
 df = df[
     (df["Incident Zip"].str.len() == 5) &
     (df["Incident Zip"] != "00000")
 ]
 
-# optional: ensure numeric-like format only
 df = df[df["Incident Zip"].str.isnumeric()]
 
 # ─────────────────────────────────────────────
-# SAFETY: ENSURE DATETIME
+# DATETIME
 # ─────────────────────────────────────────────
 df["Created Date"] = pd.to_datetime(df["Created Date"], errors="coerce")
 df = df.dropna(subset=["Created Date"])
@@ -39,7 +37,6 @@ df["Month"] = df["Created Date"].dt.to_period("M")
 # ─────────────────────────────────────────────
 st.sidebar.header("Filters")
 
-# ── Complaint Group Mode ──
 categories = sorted(df["Complaint_Group"].dropna().unique())
 
 view_mode = st.sidebar.radio(
@@ -48,16 +45,35 @@ view_mode = st.sidebar.radio(
     key="view_mode"
 )
 
+# ─────────────────────────────────────────────
+# BASE FILTERING
+# ─────────────────────────────────────────────
 if view_mode == "All":
     plot_df = df.copy()
 
 elif view_mode == "Single Group":
+
     selected_group = st.sidebar.selectbox(
         "Select Complaint Group",
         categories,
         key="complaint_group_single"
     )
+
     plot_df = df[df["Complaint_Group"] == selected_group]
+
+    # ── NEW: SUBCATEGORY DRILLDOWN ──
+    subcategories = sorted(
+        plot_df["Complaint"].dropna().unique()
+    )
+
+    selected_subcategory = st.sidebar.selectbox(
+        "Select Complaint (Subcategory)",
+        ["All"] + subcategories,
+        key="complaint_subcategory_single"
+    )
+
+    if selected_subcategory != "All":
+        plot_df = plot_df[plot_df["Complaint"] == selected_subcategory]
 
 else:
     selected_groups = st.sidebar.multiselect(
@@ -69,7 +85,7 @@ else:
     plot_df = df[df["Complaint_Group"].isin(selected_groups)]
 
 # ─────────────────────────────────────────────
-# LOCATION FILTERS (LINKED)
+# LOCATION FILTERS
 # ─────────────────────────────────────────────
 st.sidebar.subheader("Location Filters")
 
@@ -81,7 +97,6 @@ selected_neighborhood = st.sidebar.selectbox(
     key="neighborhood_filter"
 )
 
-# ZIP options depend on neighborhood
 if selected_neighborhood == "All":
     zip_options = sorted(df["Incident Zip"].dropna().unique())
 else:
@@ -95,9 +110,6 @@ selected_zip = st.sidebar.selectbox(
     key="zip_filter"
 )
 
-# ─────────────────────────────────────────────
-# APPLY LOCATION FILTERS
-# ─────────────────────────────────────────────
 if selected_neighborhood != "All":
     plot_df = plot_df[plot_df["Neighborhood"] == selected_neighborhood]
 
@@ -105,7 +117,7 @@ if selected_zip != "All":
     plot_df = plot_df[plot_df["Incident Zip"] == selected_zip]
 
 # ─────────────────────────────────────────────
-# DEBUG (optional)
+# DEBUG
 # ─────────────────────────────────────────────
 st.write("📊 Filtered Shape:", plot_df.shape)
 
@@ -122,13 +134,10 @@ time_df["Date"] = time_df["Month"].dt.to_timestamp()
 time_df = time_df.sort_values("Date")
 
 # ─────────────────────────────────────────────
-# TITLE
+# CHART
 # ─────────────────────────────────────────────
 st.subheader("📊 Monthly Complaint Trends")
 
-# ─────────────────────────────────────────────
-# ALTair CHART (INTERACTIVE + TOOLTIPS)
-# ─────────────────────────────────────────────
 if len(time_df) > 0:
 
     chart = (
