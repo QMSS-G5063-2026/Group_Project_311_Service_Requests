@@ -18,7 +18,7 @@ st.markdown("""
     border-radius: 10px;
     color: white;
 ">
-    <h1>Focused analysis of NYC 311 complaints in <b>Manhattan (2025)</h1>
+    <h1>Inside Manhattan: 311 Complaints Uncovered (2025)</h1>
     <p>Explore complaint patterns by category, neighborhood, and time to better understand
         quality-of-life issues across Manhattan.</p>
     <p style="font-size:14px; opacity:0.85;">
