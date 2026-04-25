@@ -7,7 +7,7 @@ def load_data():
     df = pd.read_csv("NYC_311_2025_Filtered.csv", low_memory=False)
 
     # Only keeping the columns we actually use.
-    cols_to_keep = ['Borough', 'Neighborhood', 'Complaint', 'Latitude', 'Longitude', 'Incident Zip']
+    cols_to_keep = ['Borough', 'Neighborhood', 'Complaint', 'Latitude', 'Longitude', 'Incident Zip','Created Date']
     df = df[cols_to_keep].copy()
     
     # Limiting to Manhattan
@@ -20,6 +20,18 @@ def load_data():
     
     # Cleaning ZIP Codes (Strings without decimals)
     df['Incident Zip'] = df['Incident Zip'].fillna(0).astype(int).astype(str)
+    
+    # ─────────────────────────────────────────────
+    # SAFE DATE PARSING (FIX FOR .dt ERROR) added for Over Time part
+    # ─────────────────────────────────────────────
+    df["Created Date"] = pd.to_datetime(df["Created Date"], errors="coerce")
+    
+    # DROP invalid dates BEFORE using .dt
+    df = df.dropna(subset=["Created Date"])
+    
+    # NOW safe to use .dt
+    df["Month"] = df["Created Date"].dt.to_period("M")
+    
     
     # Cleaning Neighborhoods (Ensures the drop-down is clean)
     df = df.dropna(subset=["Neighborhood"])
