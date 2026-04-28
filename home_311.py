@@ -1,7 +1,14 @@
+"""
+Modified on Tue Apr 28 08:01:12 2026
+
+@author: mw3595
+"""
+
 import streamlit as st
 from data_loader import load_data
 import pandas as pd
 import textwrap
+import altair as alt
 
 st.set_page_config(
     page_title="NYC 311 Explorer",
@@ -37,7 +44,7 @@ df = load_data()
 df.columns = df.columns.str.strip()
 
 # ─────────────────────────────────────────────
-# TITLE
+# CATEGORY SECTION
 # ─────────────────────────────────────────────
 st.subheader("🧩 Explore Complaint Categories")
 st.caption("👇 Click a category to see detailed complaint types and breakdowns.")
@@ -45,7 +52,7 @@ st.caption("👇 Click a category to see detailed complaint types and breakdowns
 group_counts = df["Complaint_Group"].value_counts()
 
 # ─────────────────────────────────────────────
-# CSS (FIXED FOR WRAPPING)
+# CATEGORY BUTTON STYLE
 # ─────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -58,7 +65,7 @@ div.stButton {
     width: 100%;
 }
 
-/* CARD BUTTON */
+/* CATEGORY CARDS */
 div.stButton > button {
     width: 100%;
     height: 80px;
@@ -87,7 +94,6 @@ div.stButton > button {
     transition: all 0.2s ease-in-out;
 }
 
-/* hover */
 div.stButton > button:hover {
     background: linear-gradient(180deg, #e8f1fb, #dbeafe);
     border: 1px solid #1f77b4;
@@ -95,7 +101,6 @@ div.stButton > button:hover {
     color: #1f77b4;
 }
 
-/* focus */
 div.stButton > button:focus {
     outline: none;
     border: 2px solid #1f77b4;
@@ -105,20 +110,16 @@ div.stButton > button:focus {
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# LABEL WRAPPER (NO TRUNCATION)
+# CATEGORY GRID
 # ─────────────────────────────────────────────
 def format_label(group, count, width=22):
     wrapped_group = "\n".join(textwrap.wrap(group, width=width))
     return f"{wrapped_group}\n{count:,}"
 
-# ─────────────────────────────────────────────
-# GRID
-# ─────────────────────────────────────────────
 cols = st.columns(3)
 
 for i, (group, count) in enumerate(group_counts.items()):
     with cols[i % 3]:
-
         label = format_label(group, count)
 
         if st.button(label, key=f"group_{i}"):
@@ -142,14 +143,33 @@ if selected_group:
     )
 
     complaint_counts.columns = ["Complaint", "Count"]
-
     complaint_counts = complaint_counts[
         (complaint_counts["Count"] > 0) &
         (complaint_counts["Complaint"].notna())
     ]
 
+    # ─────────────────────────────────────────────
+    # ALTair BAR CHART (NEW VERSION)
+    # ─────────────────────────────────────────────
     st.markdown("### 📋 Complaint Types")
-    st.dataframe(complaint_counts, use_container_width=True)
+
+    complaint_counts = complaint_counts.sort_values("Count", ascending=False)
+
+    top_n = 20
+    chart_data = complaint_counts.head(top_n)
+
+    chart = alt.Chart(chart_data).mark_bar().encode(
+        x=alt.X("Count:Q", title="Number of Complaints"),
+        y=alt.Y("Complaint:N", sort="-x", title=None),
+        tooltip=[
+            alt.Tooltip("Complaint:N", title="Complaint Type"),
+            alt.Tooltip("Count:Q", title="Count", format=",")
+        ]
+    ).properties(
+        height=500
+    )
+
+    st.altair_chart(chart, use_container_width=True)
 
     col1, col2 = st.columns(2)
     col1.metric("Total Complaints", len(sub_df))
