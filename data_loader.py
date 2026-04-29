@@ -1,55 +1,39 @@
 import pandas as pd
 import streamlit as st
+from pathlib import Path
 
 @st.cache_data
 def load_data():
-    # Using the direct download link for large files
-    # The 'id' comes from my shared link
-    file_id = "1RmgSdmA2lt9XoBFVd-VDZU4gWTDdxK8I"
-    url = f"https://drive.google.com/uc?export=download&id={file_id}&confirm=t"
+    # Points to the new file
+    data_path = Path(__file__).parent / "NYC_311_Manhattan_Lite.csv"
     
-    # Adding a status message so users know it's loading a large file
     try:
-        df = pd.read_csv(url, low_memory=False)
-    except Exception as e:
-        st.error("Connection to Google Drive failed. Ensure the link is set to 'Anyone with the link can view'.")
-        # Fallback to local file for terminal testing
-        try:
-            df = pd.read_csv("NYC_311_2025_Filtered.csv", low_memory=False)
-        except:
-            return pd.DataFrame()
+        df = pd.read_csv(data_path, low_memory=False)
+    except FileNotFoundError:
+        st.error("Data file NYC_311_Manhattan_Lite.csv not found!")
+        return pd.DataFrame()
 
-    # Only keeping the columns we actually use.
-    cols_to_keep = ['Borough', 'Neighborhood', 'Complaint', 'Latitude', 'Longitude', 'Incident Zip','Created Date']
+    # Defining the columns currently in the 51MB file
+    cols_to_keep = ['Neighborhood', 'Complaint', 'Latitude', 'Longitude', 'Incident Zip', 'Created Date']
     df = df[cols_to_keep].copy()
     
-    # Limiting to Manhattan
-    df = df[df['Borough'] == "MANHATTAN"].copy()
-    
-    # Numeric Coordinate Enforcement (Fixing blank maps)
+    # Numeric Coordinate Enforcement
     df['Latitude'] = pd.to_numeric(df['Latitude'], errors='coerce')
     df['Longitude'] = pd.to_numeric(df['Longitude'], errors='coerce')
     df = df.dropna(subset=["Latitude", "Longitude"])
     
-    # Cleaning ZIP Codes (Strings without decimals)
+    # Cleaning ZIP Codes
     df['Incident Zip'] = df['Incident Zip'].fillna(0).astype(int).astype(str)
     
-    # ─────────────────────────────────────────────
-    # SAFE DATE PARSING (FIX FOR .dt ERROR) added for Over Time part
-    # ─────────────────────────────────────────────
+    # Safe Date Parsing
     df["Created Date"] = pd.to_datetime(df["Created Date"], errors="coerce")
-    
-    # DROP invalid dates BEFORE using .dt
     df = df.dropna(subset=["Created Date"])
-    
-    # NOW safe to use .dt
     df["Month"] = df["Created Date"].dt.to_period("M")
     
-    
-    # Cleaning Neighborhoods (Ensures the drop-down is clean)
+    # Cleaning Neighborhoods
     df = df.dropna(subset=["Neighborhood"])
 
-    # The new mapping Logic
+    # Category Mapping Logic
     category_map = {
         # Noise Issues
         "Noise - Residential": "Noise Issues",
@@ -211,18 +195,12 @@ def load_data():
         "Incorrect Data": "Other",
     }
 
-    # Creating the New Category Column
+    # Creating A Category Column
     df['Complaint_Group'] = df['Complaint'].map(category_map).fillna('Other')
 
     # Memory Optimization
-    # Trying to keep the browser from crashing when loading citywide data
     df['Complaint_Group'] = df['Complaint_Group'].astype('category')
     df['Complaint'] = df['Complaint'].astype('category')
     df['Neighborhood'] = df['Neighborhood'].astype('category')
-    
-    # Coordinates must be floats for the map to work
-    df['Latitude'] = pd.to_numeric(df['Latitude'], errors='coerce')
-    df['Longitude'] = pd.to_numeric(df['Longitude'], errors='coerce')
-    df = df.dropna(subset=['Latitude', 'Longitude'])
 
     return df
