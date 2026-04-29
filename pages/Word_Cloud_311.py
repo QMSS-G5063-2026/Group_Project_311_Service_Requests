@@ -2,10 +2,9 @@
 """
 Word_Cloud_311.py
 NYC 311 Dashboard - Word Cloud Page
-I Love NY logo with complaint words filling the red heart.
+
 """
-# -*- coding: utf-8 -*-
-"""
+
 
 import math
 from io import BytesIO
