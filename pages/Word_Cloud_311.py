@@ -6,6 +6,8 @@
 """
 
 import math
+from io import BytesIO
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -18,21 +20,21 @@ st.set_page_config(page_title="NYC 311 Word Cloud", layout="wide")
 
 
 # ─────────────────────────────────────────────
-# HEART WORD CLOUD — returns RGBA PIL image
-# Outside the heart is transparent, inside is
-# red background with white complaint words.
+# HEART WORD CLOUD
+# Returns RGBA PIL image: heart = red + white
+# words, outside heart = transparent
 # ─────────────────────────────────────────────
-def build_heart_wordcloud(freq, max_words=80, size=600):
+def build_heart_wordcloud(freq, max_words=80, size=800):
     W = H = size
 
-    # 1. Parametric heart mask (grayscale)
+    # Parametric heart mask
     mask_img = Image.new("L", (W, H), 255)
     draw = ImageDraw.Draw(mask_img)
     cx, cy = W // 2, int(H * 0.52)
     scale = W * 0.44
     points = []
-    for i in range(2000):
-        t = 2 * math.pi * i / 2000
+    for i in range(3000):
+        t = 2 * math.pi * i / 3000
         x = 16 * math.sin(t) ** 3
         y = -(
             13 * math.cos(t)
@@ -46,74 +48,89 @@ def build_heart_wordcloud(freq, max_words=80, size=600):
     draw.polygon(points, fill=0)
     mask_arr = np.array(mask_img)  # 0=heart, 255=outside
 
-    # 2. Word cloud using mask
     rgb_mask = np.stack([mask_arr] * 3, axis=-1).astype(np.uint8)
+
     wc = WordCloud(
         mask=rgb_mask,
         background_color="red",
         color_func=lambda *a, **k: "white",
         max_words=max_words,
-        prefer_horizontal=0.80,
+        prefer_horizontal=0.75,
         contour_width=0,
-        min_font_size=7,
-        max_font_size=58,
+        min_font_size=9,
+        max_font_size=72,
         collocations=False,
+        relative_scaling=0.6,
     ).generate_from_frequencies(freq)
 
     wc_rgb = np.array(wc.to_image())
 
-    # 3. Make RGBA: transparent outside the heart
+    # Make transparent outside heart
     rgba = np.ones((H, W, 4), dtype=np.uint8) * 255
     rgba[:, :, :3] = wc_rgb
-    rgba[mask_arr > 128, 3] = 0  # transparent outside heart
+    rgba[mask_arr > 128, 3] = 0
 
-    return Image.fromarray(rgba, "RGBA")
+    return Image.fromarray(rgba, "RGBA"), wc
 
 
 # ─────────────────────────────────────────────
 # COMPOSE FULL I ♥ NY LOGO
+# Composites heart into PIL canvas, then
+# overlays bold serif "I" and "NY" via
+# matplotlib on a transparent layer.
 # ─────────────────────────────────────────────
 def compose_logo(heart_img):
-    LOGO_W, LOGO_H = 1400, 400
+    LOGO_W, LOGO_H = 1600, 420
 
-    canvas = Image.new("RGBA", (LOGO_W, LOGO_H), (255, 255, 255, 255))
+    # Base white canvas
+    canvas = Image.new("RGB", (LOGO_W, LOGO_H), (255, 255, 255))
 
-    # Resize and paste heart (center at ~38% from left)
-    heart_size = 310
-    h_resized = heart_img.resize((heart_size, heart_size), Image.LANCZOS)
-    hx = int(LOGO_W * 0.385) - heart_size // 2
-    hy = (LOGO_H - heart_size) // 2 + 5
-    canvas.paste(h_resized, (hx, hy), h_resized)
+    # Paste heart centered at ~36% from left
+    heart_size = 360
+    h_res = heart_img.resize((heart_size, heart_size), Image.LANCZOS)
+    hx = 570 - heart_size // 2
+    hy = (LOGO_H - heart_size) // 2 + 8
+    canvas.paste(h_res, (hx, hy), h_res)
 
-    # Matplotlib for bold serif "I" and "NY" text
-    fig, ax = plt.subplots(figsize=(14, 4), facecolor="white")
-    ax.set_xlim(0, LOGO_W)
-    ax.set_ylim(0, LOGO_H)
-    ax.axis("off")
+    # Render bold text on transparent layer
+    fig_txt, ax_txt = plt.subplots(figsize=(16, 4.2), facecolor="none")
+    fig_txt.patch.set_alpha(0)
+    ax_txt.set_xlim(0, LOGO_W)
+    ax_txt.set_ylim(0, LOGO_H)
+    ax_txt.axis("off")
 
-    canvas_rgb = canvas.convert("RGB")
-    ax.imshow(np.array(canvas_rgb),
-              extent=[0, LOGO_W, 0, LOGO_H],
-              origin="upper", aspect="auto", zorder=1)
-
-    # "I" — left
-    ax.text(
-        200, LOGO_H // 2 + 5, "I",
-        fontsize=290, fontweight="bold", color="black",
-        ha="center", va="center",
-        fontfamily="DejaVu Serif", zorder=2,
+    ax_txt.text(
+        190, LOGO_H // 2 + 10, "I",
+        fontsize=340, fontweight="bold", color="black",
+        ha="center", va="center", fontfamily="DejaVu Serif",
     )
-
-    # "NY" — right
-    ax.text(
-        960, LOGO_H // 2 + 5, "NY",
-        fontsize=235, fontweight="bold", color="black",
-        ha="center", va="center",
-        fontfamily="DejaVu Serif", zorder=2,
+    ax_txt.text(
+        1090, LOGO_H // 2 + 10, "NY",
+        fontsize=275, fontweight="bold", color="black",
+        ha="center", va="center", fontfamily="DejaVu Serif",
     )
 
     plt.tight_layout(pad=0)
-    return fig
+    buf = BytesIO()
+    fig_txt.savefig(buf, format="png", dpi=150,
+                    bbox_inches="tight", transparent=True)
+    plt.close(fig_txt)
+
+    buf.seek(0)
+    text_img = Image.open(buf).convert("RGBA")
+    text_img = text_img.resize((LOGO_W, LOGO_H), Image.LANCZOS)
+
+    # Composite text over canvas
+    canvas_rgba = canvas.convert("RGBA")
+    canvas_rgba.paste(text_img, (0, 0), text_img)
+
+    # Final figure for Streamlit
+    result = canvas_rgba.convert("RGB")
+    fig, ax = plt.subplots(figsize=(16, 4.2), facecolor="white")
+    ax.imshow(np.array(result))
+    ax.axis("off")
+    plt.tight_layout(pad=0)
+    return fig, result
 
 
 # ─────────────────────────────────────────────
@@ -155,7 +172,7 @@ else:
     selected_issue = "All in Category"
 
 st.sidebar.divider()
-max_words = st.sidebar.slider("Max Words", min_value=20, max_value=150, value=80, step=10)
+max_words = st.sidebar.slider("Max Words in Heart", min_value=20, max_value=150, value=80, step=10)
 
 
 # ─────────────────────────────────────────────
@@ -186,19 +203,18 @@ else:
     freq = filtered["Complaint"].value_counts().to_dict()
 
     with st.spinner("Generating word cloud..."):
-        heart_img = build_heart_wordcloud(freq, max_words=max_words, size=600)
-        fig = compose_logo(heart_img)
+        heart_img, wc_obj = build_heart_wordcloud(freq, max_words=max_words, size=800)
+        fig, result_img = compose_logo(heart_img)
 
     st.pyplot(fig, use_container_width=True)
     plt.close(fig)
 
-    # Download button
-    from io import BytesIO
-    buf = BytesIO()
-    heart_img.convert("RGB").save(buf, format="PNG")
+    # Download full logo
+    buf_out = BytesIO()
+    result_img.save(buf_out, format="PNG")
     st.download_button(
-        label="⬇️ Download Word Cloud Heart",
-        data=buf.getvalue(),
+        label="⬇️ Download I ♥ NY Word Cloud",
+        data=buf_out.getvalue(),
         file_name="i_love_ny_311_wordcloud.png",
         mime="image/png",
     )
