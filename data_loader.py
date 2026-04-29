@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 from pathlib import Path
 
-@st.cache_data
+@st.cache_data(show_spinner="Refreshing Data...")
 def load_data():
     # Points to the new file
     data_path = Path(__file__).parent / "NYC_311_Manhattan_Lite.csv"

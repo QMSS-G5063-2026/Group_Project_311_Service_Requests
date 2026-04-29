@@ -41,7 +41,6 @@ st.divider()
 # LOAD DATA
 # ─────────────────────────────────────────────
 df = load_data()
-df.columns = df.columns.str.strip()
 
 # ─────────────────────────────────────────────
 # CATEGORY SECTION
