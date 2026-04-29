@@ -2,9 +2,8 @@
 """
 Word_Cloud_311.py
 NYC 311 Dashboard - Word Cloud Page
-
+I Love NY logo — exact original proportions, black words in red heart.
 """
-
 
 import math
 from io import BytesIO
