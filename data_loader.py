@@ -3,8 +3,21 @@ import streamlit as st
 
 @st.cache_data
 def load_data():
-    # Loading the 2025 Filtered Master File
-    df = pd.read_csv("NYC_311_2025_Filtered.csv", low_memory=False)
+    # Using the direct download link for large files
+    # The 'id' comes from my shared link
+    file_id = "1RmgSdmA2lt9XoBFVd-VDZU4gWTDdxK8I"
+    url = f"https://drive.google.com/uc?export=download&id={file_id}&confirm=t"
+    
+    # Adding a status message so users know it's loading a large file
+    try:
+        df = pd.read_csv(url, low_memory=False)
+    except Exception as e:
+        st.error("Connection to Google Drive failed. Ensure the link is set to 'Anyone with the link can view'.")
+        # Fallback to local file for terminal testing
+        try:
+            df = pd.read_csv("NYC_311_2025_Filtered.csv", low_memory=False)
+        except:
+            return pd.DataFrame()
 
     # Only keeping the columns we actually use.
     cols_to_keep = ['Borough', 'Neighborhood', 'Complaint', 'Latitude', 'Longitude', 'Incident Zip','Created Date']
