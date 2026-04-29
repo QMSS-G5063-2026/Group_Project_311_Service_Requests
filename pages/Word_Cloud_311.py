@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-- Word_Cloud_311.py
-- NYC 311 Dashboard - Word Cloud Page
-- I Love NY logo with complaint words filling the red heart.
+Word_Cloud_311.py
+NYC 311 Dashboard - Word Cloud Page
+I Love NY logo with complaint words filling the red heart.
 """
 
 import math
@@ -21,8 +21,6 @@ st.set_page_config(page_title="NYC 311 Word Cloud", layout="wide")
 
 # ─────────────────────────────────────────────
 # HEART WORD CLOUD
-# Returns RGBA PIL image: heart = red + white
-# words, outside heart = transparent
 # ─────────────────────────────────────────────
 def build_heart_wordcloud(freq, max_words=80, size=800):
     W = H = size
@@ -46,7 +44,7 @@ def build_heart_wordcloud(freq, max_words=80, size=800):
         py = int(cy + scale * y / 16)
         points.append((px, py))
     draw.polygon(points, fill=0)
-    mask_arr = np.array(mask_img)  # 0=heart, 255=outside
+    mask_arr = np.array(mask_img)
 
     rgb_mask = np.stack([mask_arr] * 3, axis=-1).astype(np.uint8)
 
@@ -58,14 +56,14 @@ def build_heart_wordcloud(freq, max_words=80, size=800):
         prefer_horizontal=0.75,
         contour_width=0,
         min_font_size=9,
-        max_font_size=72,
+        max_font_size=80,
         collocations=False,
         relative_scaling=0.6,
     ).generate_from_frequencies(freq)
 
     wc_rgb = np.array(wc.to_image())
 
-    # Make transparent outside heart
+    # Transparent outside heart
     rgba = np.ones((H, W, 4), dtype=np.uint8) * 255
     rgba[:, :, :3] = wc_rgb
     rgba[mask_arr > 128, 3] = 0
@@ -75,25 +73,21 @@ def build_heart_wordcloud(freq, max_words=80, size=800):
 
 # ─────────────────────────────────────────────
 # COMPOSE FULL I ♥ NY LOGO
-# Composites heart into PIL canvas, then
-# overlays bold serif "I" and "NY" via
-# matplotlib on a transparent layer.
 # ─────────────────────────────────────────────
 def compose_logo(heart_img):
-    LOGO_W, LOGO_H = 1600, 420
+    LOGO_W, LOGO_H = 1600, 500
 
-    # Base white canvas
     canvas = Image.new("RGB", (LOGO_W, LOGO_H), (255, 255, 255))
 
-    # Paste heart centered at ~36% from left
-    heart_size = 360
+    # Big heart — 460px
+    heart_size = 460
     h_res = heart_img.resize((heart_size, heart_size), Image.LANCZOS)
     hx = 570 - heart_size // 2
     hy = (LOGO_H - heart_size) // 2 + 8
     canvas.paste(h_res, (hx, hy), h_res)
 
-    # Render bold text on transparent layer
-    fig_txt, ax_txt = plt.subplots(figsize=(16, 4.2), facecolor="none")
+    # Bold serif text on transparent layer
+    fig_txt, ax_txt = plt.subplots(figsize=(16, 5), facecolor="none")
     fig_txt.patch.set_alpha(0)
     ax_txt.set_xlim(0, LOGO_W)
     ax_txt.set_ylim(0, LOGO_H)
@@ -101,12 +95,12 @@ def compose_logo(heart_img):
 
     ax_txt.text(
         190, LOGO_H // 2 + 10, "I",
-        fontsize=340, fontweight="bold", color="black",
+        fontsize=380, fontweight="bold", color="black",
         ha="center", va="center", fontfamily="DejaVu Serif",
     )
     ax_txt.text(
-        1090, LOGO_H // 2 + 10, "NY",
-        fontsize=275, fontweight="bold", color="black",
+        1110, LOGO_H // 2 + 10, "NY",
+        fontsize=310, fontweight="bold", color="black",
         ha="center", va="center", fontfamily="DejaVu Serif",
     )
 
@@ -120,13 +114,12 @@ def compose_logo(heart_img):
     text_img = Image.open(buf).convert("RGBA")
     text_img = text_img.resize((LOGO_W, LOGO_H), Image.LANCZOS)
 
-    # Composite text over canvas
     canvas_rgba = canvas.convert("RGBA")
     canvas_rgba.paste(text_img, (0, 0), text_img)
+    result = canvas_rgba.convert("RGB")
 
     # Final figure for Streamlit
-    result = canvas_rgba.convert("RGB")
-    fig, ax = plt.subplots(figsize=(16, 4.2), facecolor="white")
+    fig, ax = plt.subplots(figsize=(16, 5), facecolor="white")
     ax.imshow(np.array(result))
     ax.axis("off")
     plt.tight_layout(pad=0)
