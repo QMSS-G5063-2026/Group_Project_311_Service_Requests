@@ -1,0 +1,8 @@
+streamlit
+pandas
+altair
+pydeck
+numpy
+matplotlib
+Pillow
+wordcloud
