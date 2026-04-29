@@ -9,6 +9,11 @@ Created on Sun Apr 19 11:49:18 2026
 - Filters mirror Map_311.py and Over_Time_311.py exactly.
 """#
 
+import subprocess
+import sys
+
+subprocess.run([sys.executable, "-m", "pip", "install", "matplotlib", "wordcloud", "Pillow"],
+               capture_output=True)
 
 import streamlit as st
 import pandas as pd
@@ -17,9 +22,6 @@ import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw, ImageFilter
 from wordcloud import WordCloud
 from data_loader import load_data
- 
-st.set_page_config(page_title="NYC 311 Word Cloud", layout="wide")
- 
  
 # ─────────────────────────────────────────────
 # BOROUGH SILHOUETTE MASKS
