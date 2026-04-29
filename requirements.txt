@@ -1,8 +1,8 @@
 streamlit
 pandas
-altair
 pydeck
-numpy
 matplotlib
-Pillow
 wordcloud
+numpy
+altair
+Pillow
