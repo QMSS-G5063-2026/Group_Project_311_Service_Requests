@@ -12,22 +12,21 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 from wordcloud import WordCloud
 from data_loader import load_data
 
 st.set_page_config(page_title="NYC 311 Word Cloud", layout="wide")
 
+# Best available slab serif font — closest to American Typewriter
+FONT_PATH = "/usr/share/fonts/truetype/freefont/FreeSerifBold.ttf"
+
 
 # ─────────────────────────────────────────────
 # HEART WORD CLOUD
-# Returns RGBA PIL image: heart = red bg +
-# white words, outside = transparent
 # ─────────────────────────────────────────────
 def build_heart_wordcloud(freq, max_words=80, size=1000):
     W = H = size
-
-    # Parametric heart mask
     mask_img = Image.new("L", (W, H), 255)
     draw = ImageDraw.Draw(mask_img)
     cx, cy = W // 2, int(H * 0.52)
@@ -49,7 +48,6 @@ def build_heart_wordcloud(freq, max_words=80, size=1000):
     mask_arr = np.array(mask_img)
 
     rgb_mask = np.stack([mask_arr] * 3, axis=-1).astype(np.uint8)
-
     wc = WordCloud(
         mask=rgb_mask,
         background_color="red",
@@ -64,72 +62,82 @@ def build_heart_wordcloud(freq, max_words=80, size=1000):
     ).generate_from_frequencies(freq)
 
     wc_rgb = np.array(wc.to_image())
-
-    # Transparent outside heart
     rgba = np.ones((H, W, 4), dtype=np.uint8) * 255
     rgba[:, :, :3] = wc_rgb
     rgba[mask_arr > 128, 3] = 0
-
     return Image.fromarray(rgba, "RGBA"), wc
 
 
 # ─────────────────────────────────────────────
+# RENDER TEXT WITH PIL FONT
+# ─────────────────────────────────────────────
+def render_text_pil(text, font_path, font_size):
+    """Render text to tight RGBA PIL image using exact font file."""
+    try:
+        font = ImageFont.truetype(font_path, font_size)
+    except Exception:
+        font = ImageFont.load_default()
+    dummy = Image.new("RGBA", (1, 1))
+    dd = ImageDraw.Draw(dummy)
+    bbox = dd.textbbox((0, 0), text, font=font)
+    pad = 10
+    w = bbox[2] - bbox[0] + pad * 2
+    h = bbox[3] - bbox[1] + pad * 2
+    img = Image.new("RGBA", (w, h), (255, 255, 255, 0))
+    draw = ImageDraw.Draw(img)
+    draw.text((-bbox[0] + pad, -bbox[1] + pad), text,
+              font=font, fill=(0, 0, 0, 255))
+    return img
+
+
+# ─────────────────────────────────────────────
 # COMPOSE FULL I ♥ NY LOGO
-# Heart dominates center, I and NY hug edges
+# All-PIL composition — no matplotlib axis flip issues
 # ─────────────────────────────────────────────
 def compose_logo(heart_img):
-    # Tight layout: I=180px | gap=20 | heart=660px | gap=20 | NY=420px
-    LOGO_W = 1300
-    LOGO_H = 520
+    heart_size = 660
+
+    # Font size: make text cap height ~72% of heart height
+    target_h = int(heart_size * 0.72)
+    font_size = 500
+    for fs in range(500, 100, -5):
+        test = render_text_pil("NY", FONT_PATH, fs)
+        if test.height <= target_h:
+            font_size = fs
+            break
+
+    i_img  = render_text_pil("I",  FONT_PATH, font_size)
+    ny_img = render_text_pil("NY", FONT_PATH, font_size)
+
+    GAP = 15
+    LOGO_H = heart_size + 60
+    LOGO_W = i_img.width + GAP + heart_size + GAP + ny_img.width
 
     canvas = Image.new("RGB", (LOGO_W, LOGO_H), (255, 255, 255))
 
-    # Heart: 660px, starting at x=200
-    heart_size = 660
+    # Paste heart centered
     h_res = heart_img.resize((heart_size, heart_size), Image.LANCZOS)
-    hx = 200
-    hy = (LOGO_H - heart_size) // 2 + 5
+    hx = i_img.width + GAP
+    hy = (LOGO_H - heart_size) // 2
     canvas.paste(h_res, (hx, hy), h_res)
 
-    # Bold serif text on transparent layer
-    fig_txt, ax_txt = plt.subplots(
-        figsize=(LOGO_W / 100, LOGO_H / 100), facecolor="none"
-    )
-    fig_txt.patch.set_alpha(0)
-    ax_txt.set_xlim(0, LOGO_W)
-    ax_txt.set_ylim(0, LOGO_H)
-    ax_txt.axis("off")
-
-    # "I" — hugging left edge of heart
-    ax_txt.text(
-        95, LOGO_H // 2 + 10, "I",
-        fontsize=230, fontweight="bold", color="black",
-        ha="center", va="center", fontfamily="DejaVu Serif",
-    )
-
-    # "NY" — hugging right edge of heart
-    ax_txt.text(
-        1080, LOGO_H // 2 + 10, "NY",
-        fontsize=200, fontweight="bold", color="black",
-        ha="center", va="center", fontfamily="DejaVu Serif",
-    )
-
-    plt.tight_layout(pad=0)
-    buf = BytesIO()
-    fig_txt.savefig(buf, format="png", dpi=100,
-                    bbox_inches="tight", transparent=True)
-    plt.close(fig_txt)
-
-    buf.seek(0)
-    text_img = Image.open(buf).convert("RGBA")
-    text_img = text_img.resize((LOGO_W, LOGO_H), Image.LANCZOS)
-
     canvas_rgba = canvas.convert("RGBA")
-    canvas_rgba.paste(text_img, (0, 0), text_img)
+
+    # Paste "I"
+    iy = (LOGO_H - i_img.height) // 2
+    canvas_rgba.paste(i_img, (0, iy), i_img)
+
+    # Paste "NY"
+    ny_x = i_img.width + GAP + heart_size + GAP
+    ny_y = (LOGO_H - ny_img.height) // 2
+    canvas_rgba.paste(ny_img, (ny_x, ny_y), ny_img)
+
     result = canvas_rgba.convert("RGB")
 
-    # Final figure for Streamlit
-    fig, ax = plt.subplots(figsize=(13, 5.2), facecolor="white")
+    # Display via matplotlib
+    fig, ax = plt.subplots(
+        figsize=(LOGO_W / 100, LOGO_H / 100), facecolor="white"
+    )
     ax.imshow(np.array(result))
     ax.axis("off")
     plt.tight_layout(pad=0)
@@ -212,7 +220,6 @@ else:
     st.pyplot(fig, use_container_width=True)
     plt.close(fig)
 
-    # Download
     buf_out = BytesIO()
     result_img.save(buf_out, format="PNG")
     st.download_button(
