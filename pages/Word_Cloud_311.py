@@ -18,14 +18,19 @@ from data_loader import load_data
 
 st.set_page_config(page_title="NYC 311 Word Cloud", layout="wide")
 
-# Best available slab serif font — closest to American Typewriter
+# Slab serif font — closest available to American Typewriter
 FONT_PATH = "/usr/share/fonts/truetype/freefont/FreeSerifBold.ttf"
+
+# Fixed layout constants — DO NOT auto-scale these
+HEART_SIZE = 500   # px — heart width & height
+FONT_SIZE  = 260   # px — I and NY cap height
 
 
 # ─────────────────────────────────────────────
 # HEART WORD CLOUD
 # ─────────────────────────────────────────────
-def build_heart_wordcloud(freq, max_words=80, size=1000):
+def build_heart_wordcloud(freq, max_words=80):
+    size = 800
     W = H = size
     mask_img = Image.new("L", (W, H), 255)
     draw = ImageDraw.Draw(mask_img)
@@ -55,10 +60,10 @@ def build_heart_wordcloud(freq, max_words=80, size=1000):
         max_words=max_words,
         prefer_horizontal=0.75,
         contour_width=0,
-        min_font_size=10,
-        max_font_size=90,
+        min_font_size=8,
+        max_font_size=70,
         collocations=False,
-        relative_scaling=0.6,
+        relative_scaling=0.5,
     ).generate_from_frequencies(freq)
 
     wc_rgb = np.array(wc.to_image())
@@ -69,72 +74,56 @@ def build_heart_wordcloud(freq, max_words=80, size=1000):
 
 
 # ─────────────────────────────────────────────
-# RENDER TEXT WITH PIL FONT
+# RENDER TEXT WITH PIL
 # ─────────────────────────────────────────────
-def render_text_pil(text, font_path, font_size):
-    """Render text to tight RGBA PIL image using exact font file."""
+def render_text(text, font_size):
     try:
-        font = ImageFont.truetype(font_path, font_size)
+        font = ImageFont.truetype(FONT_PATH, font_size)
     except Exception:
         font = ImageFont.load_default()
     dummy = Image.new("RGBA", (1, 1))
-    dd = ImageDraw.Draw(dummy)
-    bbox = dd.textbbox((0, 0), text, font=font)
-    pad = 10
+    bbox = ImageDraw.Draw(dummy).textbbox((0, 0), text, font=font)
+    pad = 8
     w = bbox[2] - bbox[0] + pad * 2
     h = bbox[3] - bbox[1] + pad * 2
     img = Image.new("RGBA", (w, h), (255, 255, 255, 0))
-    draw = ImageDraw.Draw(img)
-    draw.text((-bbox[0] + pad, -bbox[1] + pad), text,
-              font=font, fill=(0, 0, 0, 255))
+    ImageDraw.Draw(img).text(
+        (-bbox[0] + pad, -bbox[1] + pad),
+        text, font=font, fill=(0, 0, 0, 255)
+    )
     return img
 
 
 # ─────────────────────────────────────────────
 # COMPOSE FULL I ♥ NY LOGO
-# All-PIL composition — no matplotlib axis flip issues
 # ─────────────────────────────────────────────
 def compose_logo(heart_img):
-    heart_size = 660
+    i_img  = render_text("I",  FONT_SIZE)
+    ny_img = render_text("NY", FONT_SIZE)
 
-    # Font size: make text cap height ~72% of heart height
-    target_h = int(heart_size * 0.72)
-    font_size = 500
-    for fs in range(500, 100, -5):
-        test = render_text_pil("NY", FONT_PATH, fs)
-        if test.height <= target_h:
-            font_size = fs
-            break
+    GAP    = 40
+    LOGO_H = HEART_SIZE + 80
+    LOGO_W = i_img.width + GAP + HEART_SIZE + GAP + ny_img.width
 
-    i_img  = render_text_pil("I",  FONT_PATH, font_size)
-    ny_img = render_text_pil("NY", FONT_PATH, font_size)
+    canvas = Image.new("RGBA", (LOGO_W, LOGO_H), (255, 255, 255, 255))
 
-    GAP = 15
-    LOGO_H = heart_size + 60
-    LOGO_W = i_img.width + GAP + heart_size + GAP + ny_img.width
-
-    canvas = Image.new("RGB", (LOGO_W, LOGO_H), (255, 255, 255))
-
-    # Paste heart centered
-    h_res = heart_img.resize((heart_size, heart_size), Image.LANCZOS)
+    # Heart — centered vertically
+    h_res = heart_img.resize((HEART_SIZE, HEART_SIZE), Image.LANCZOS)
     hx = i_img.width + GAP
-    hy = (LOGO_H - heart_size) // 2
+    hy = (LOGO_H - HEART_SIZE) // 2
     canvas.paste(h_res, (hx, hy), h_res)
 
-    canvas_rgba = canvas.convert("RGBA")
-
-    # Paste "I"
+    # "I" — centered vertically
     iy = (LOGO_H - i_img.height) // 2
-    canvas_rgba.paste(i_img, (0, iy), i_img)
+    canvas.paste(i_img, (0, iy), i_img)
 
-    # Paste "NY"
-    ny_x = i_img.width + GAP + heart_size + GAP
-    ny_y = (LOGO_H - ny_img.height) // 2
-    canvas_rgba.paste(ny_img, (ny_x, ny_y), ny_img)
+    # "NY" — centered vertically
+    nx = i_img.width + GAP + HEART_SIZE + GAP
+    ny = (LOGO_H - ny_img.height) // 2
+    canvas.paste(ny_img, (nx, ny), ny_img)
 
-    result = canvas_rgba.convert("RGB")
+    result = canvas.convert("RGB")
 
-    # Display via matplotlib
     fig, ax = plt.subplots(
         figsize=(LOGO_W / 100, LOGO_H / 100), facecolor="white"
     )
@@ -214,7 +203,7 @@ else:
     freq = filtered["Complaint"].value_counts().to_dict()
 
     with st.spinner("Generating word cloud..."):
-        heart_img, wc_obj = build_heart_wordcloud(freq, max_words=max_words, size=1000)
+        heart_img, wc_obj = build_heart_wordcloud(freq, max_words=max_words)
         fig, result_img = compose_logo(heart_img)
 
     st.pyplot(fig, use_container_width=True)
