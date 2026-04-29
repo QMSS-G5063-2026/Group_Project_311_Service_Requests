@@ -2,14 +2,15 @@
 """
 Word_Cloud_311.py
 NYC 311 Dashboard - Word Cloud Page
-Word cloud shaped as a heart (I Love NY style).
+I Love NY logo with complaint words filling the red heart.
 """
 
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from PIL import Image, ImageDraw
+import matplotlib.patches as mpatches
+from PIL import Image, ImageDraw, ImageFont
 from wordcloud import WordCloud
 from data_loader import load_data
 
@@ -17,38 +18,110 @@ st.set_page_config(page_title="NYC 311 Word Cloud", layout="wide")
 
 
 # ─────────────────────────────────────────────
-# HEART MASK  (black = fill area, white = background)
+# BUILD HEART MASK
+# Only the heart region is black (word fill area)
+# Everything else is white (no words)
 # ─────────────────────────────────────────────
 @st.cache_resource
-def build_heart_mask(W=800, H=700):
-    img = Image.new("RGB", (W, H), "white")
+def build_heart_mask(W=400, H=400):
+    """
+    Creates a mask where the heart shape is black (0) = word area,
+    and everything else is white (255) = background.
+    Uses a parametric heart curve for a clean shape.
+    """
+    img = Image.new("L", (W, H), 255)  # grayscale, all white
     draw = ImageDraw.Draw(img)
 
-    cx, cy = W // 2, H // 2
-    r = 180
+    cx, cy = W // 2, H // 2 + 20
+    scale = 130
 
-    # Left circle of heart
-    draw.ellipse(
-        [cx - r - r // 2, cy - r - 30, cx - r // 2 + r // 2, cy + r // 2],
-        fill="black"
-    )
-    # Right circle of heart
-    draw.ellipse(
-        [cx - r // 2 + r // 4, cy - r - 30, cx + r + r // 4, cy + r // 2],
-        fill="black"
-    )
-    # Bottom triangle to form the point
-    draw.polygon(
-        [
-            (cx - r - r // 2 + 10, cy + r // 4),
-            (cx + r + r // 4 - 10,  cy + r // 4),
-            (cx + r // 8,            cy + r * 2),
-        ],
-        fill="black"
-    )
+    # Parametric heart: x = 16sin³t, y = 13cost - 5cos2t - 2cos3t - cos4t
+    import math
+    points = []
+    steps = 300
+    for i in range(steps + 1):
+        t = 2 * math.pi * i / steps
+        x = 16 * (math.sin(t) ** 3)
+        y = -(13 * math.cos(t)
+              - 5 * math.cos(2 * t)
+              - 2 * math.cos(3 * t)
+              - math.cos(4 * t))
+        px = int(cx + scale * x / 16)
+        py = int(cy + scale * y / 16)
+        points.append((px, py))
+
+    draw.polygon(points, fill=0)  # 0 = black = word area
 
     arr = np.array(img)
-    return np.where(arr < 128, 0, 255).astype(np.uint8)
+    # Stack to RGB so WordCloud accepts it
+    return np.stack([arr, arr, arr], axis=-1).astype(np.uint8)
+
+
+# ─────────────────────────────────────────────
+# DRAW THE FULL I ♥ NY LOGO
+# ─────────────────────────────────────────────
+def draw_i_love_ny_logo(wc_image):
+    """
+    Takes the rendered word cloud image (PIL Image) of the heart,
+    and composites it into the full I Love NY logo layout.
+    Returns a matplotlib figure.
+    """
+    import math
+
+    W, H = 900, 340
+    logo = Image.new("RGBA", (W, H), (255, 255, 255, 255))
+    draw = ImageDraw.Draw(logo)
+
+    # ── Draw the heart with word cloud inside ──
+    heart_size = 220
+    heart_img = wc_image.resize((heart_size, heart_size), Image.LANCZOS)
+
+    # Convert heart wordcloud to RGBA
+    heart_rgba = heart_img.convert("RGBA")
+
+    # Paste heart onto logo (centered vertically, at ~1/3 from left)
+    heart_x = 270
+    heart_y = (H - heart_size) // 2 + 10
+    logo.paste(heart_rgba, (heart_x, heart_y), heart_rgba)
+
+    # ── Draw "I" on the left ──
+    # We'll use matplotlib for text rendering (avoids font file dependency)
+    fig, ax = plt.subplots(figsize=(11, 4.2), facecolor="white")
+    ax.set_xlim(0, W)
+    ax.set_ylim(0, H)
+    ax.axis("off")
+
+    # Show the logo image
+    ax.imshow(logo, extent=[0, W, 0, H], origin="upper", aspect="auto", zorder=1)
+
+    # "I" — left side
+    ax.text(
+        160, H // 2 + 5,
+        "I",
+        fontsize=195,
+        fontweight="bold",
+        color="black",
+        ha="center",
+        va="center",
+        fontfamily="serif",
+        zorder=2,
+    )
+
+    # "NY" — right side
+    ax.text(
+        690, H // 2 + 5,
+        "NY",
+        fontsize=165,
+        fontweight="bold",
+        color="black",
+        ha="center",
+        va="center",
+        fontfamily="serif",
+        zorder=2,
+    )
+
+    plt.tight_layout(pad=0.1)
+    return fig
 
 
 # ─────────────────────────────────────────────
@@ -91,7 +164,7 @@ else:
     selected_issue = "All in Category"
 
 st.sidebar.divider()
-max_words = st.sidebar.slider("Max Words", min_value=20, max_value=200, value=100, step=10)
+max_words = st.sidebar.slider("Max Words", min_value=20, max_value=200, value=80, step=10)
 
 
 # ─────────────────────────────────────────────
@@ -111,62 +184,41 @@ if selected_issue != "All in Category":
 # PAGE
 # ─────────────────────────────────────────────
 st.title("🗽 NYC 311 Complaint Word Cloud")
-st.markdown(f"Displaying **{len(filtered):,}** reports — words inside a red heart")
+st.markdown(f"Displaying **{len(filtered):,}** complaints — words fill the ❤️ in the I ♥ NY logo")
 
 if filtered.empty:
     st.warning("No complaints match the current filters. Try broadening your selection.")
 else:
     freq = filtered["Complaint"].value_counts().to_dict()
 
-    # Red heart background, white words
+    # Generate word cloud shaped to heart, red bg, white words
     wc = WordCloud(
         mask=mask,
         background_color="red",
         color_func=lambda *args, **kwargs: "white",
         max_words=max_words,
-        prefer_horizontal=0.85,
-        contour_width=5,
-        contour_color="#8B0000",
-        min_font_size=8,
-        max_font_size=120,
+        prefer_horizontal=0.80,
+        contour_width=0,
+        min_font_size=6,
+        max_font_size=60,
         collocations=False,
     ).generate_from_frequencies(freq)
 
-    fig, ax = plt.subplots(figsize=(10, 9), facecolor="white")
-    ax.imshow(wc, interpolation="bilinear")
+    wc_image = wc.to_image()  # PIL Image
 
-    # "I ♥ NY" label overlaid on the heart
-    ax.text(
-        0.5, 0.10,
-        "I  \u2665  NY",
-        transform=ax.transAxes,
-        fontsize=40,
-        fontweight="bold",
-        color="white",
-        ha="center",
-        va="center",
-        zorder=5,
-        bbox=dict(
-            boxstyle="round,pad=0.4",
-            facecolor="red",
-            edgecolor="#8B0000",
-            linewidth=2,
-        )
-    )
-
-    ax.axis("off")
-    plt.tight_layout(pad=0)
+    # Composite into full I ♥ NY logo
+    fig = draw_i_love_ny_logo(wc_image)
     st.pyplot(fig, use_container_width=True)
     plt.close(fig)
 
-    # Download button
+    # Download the word cloud heart only
     from io import BytesIO
     buf = BytesIO()
-    wc.to_image().save(buf, format="PNG")
+    wc_image.save(buf, format="PNG")
     st.download_button(
-        label="\u2b07\ufe0f Download Word Cloud",
+        label="⬇️ Download Word Cloud",
         data=buf.getvalue(),
-        file_name="wordcloud_i_love_ny.png",
+        file_name="i_love_ny_wordcloud.png",
         mime="image/png",
     )
 
