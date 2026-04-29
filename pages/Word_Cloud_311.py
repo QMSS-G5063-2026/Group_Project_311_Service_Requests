@@ -7,8 +7,7 @@ Created on Sun Apr 19 11:49:18 2026
 - Word Cloud page for NYC 311 Dashboard
 - Word cloud reshapes into the selected borough's silhouette.
 - Filters mirror Map_311.py and Over_Time_311.py exactly.
-"""
-#
+"""#
 
 
 import streamlit as st
@@ -21,9 +20,10 @@ from data_loader import load_data
  
 st.set_page_config(page_title="NYC 311 Word Cloud", layout="wide")
  
+ 
 # ─────────────────────────────────────────────
 # BOROUGH SILHOUETTE MASKS
-# Each mask: black (0) = fill area, white (255) = background
+# Black (0) = fill area, White (255) = background
 # ─────────────────────────────────────────────
 def _make_mask(polys, W=800, H=500):
     img = Image.new("RGB", (W, H), "white")
@@ -34,65 +34,81 @@ def _make_mask(polys, W=800, H=500):
     arr = np.array(img)
     return np.where(arr < 200, 0, 255).astype(np.uint8)
  
+ 
 @st.cache_resource
 def build_masks():
+    # Manhattan — tall narrow island shape
     manhattan = [
-        (80,380),(100,330),(125,278),(155,228),(190,182),(228,140),
-        (268,104),(308,74),(348,50),(386,34),(420,26),(450,26),
-        (476,34),(498,50),(514,72),(524,98),(528,126),(526,156),
-        (518,186),(504,214),(486,240),(464,262),(440,282),(414,298),
-        (386,310),(356,320),(326,326),(296,328),(268,326),(242,320),
-        (218,310),(198,296),(180,278),(166,256),(155,232),(148,205),
-        (144,178),(143,150),(145,122),(150,96),(158,72),(168,52),
-        (180,36),(194,24),(210,16),(228,12),(247,12),(80,380),
+        (370, 10), (395, 12), (418, 20), (438, 34), (452, 52),
+        (460, 74), (462, 98), (458, 124), (450, 150), (438, 175),
+        (422, 198), (403, 220), (382, 240), (358, 258), (333, 273),
+        (307, 285), (280, 293), (253, 297), (226, 297), (200, 292),
+        (176, 283), (154, 270), (135, 254), (119, 235), (107, 214),
+        (99, 192),  (95, 169),  (95, 146),  (99, 123),  (107, 101),
+        (119, 81),  (135, 63),  (154, 48),  (176, 36),  (200, 27),
+        (226, 22),  (253, 20),  (280, 21),  (307, 26),  (333, 35),
+        (358, 47),  (370, 10),
     ]
+ 
+    # Brooklyn — wide trapezoid shape
     brooklyn = [
-        (60,70),(170,48),(285,42),(390,48),(480,62),(548,82),
-        (598,108),(628,138),(640,172),(632,206),(612,236),(582,260),
-        (544,278),(502,290),(458,298),(413,302),(368,303),(323,300),
-        (280,293),(240,283),(204,270),(173,254),(148,236),(130,216),
-        (118,196),(112,175),(112,154),(118,134),(129,115),(145,98),
-        (163,84),(180,74),(140,72),(100,70),(60,70),
+        (60,  70), (200, 40), (350, 30), (500, 40), (620, 70),
+        (700, 110),(740, 160),(730, 210),(700, 255),(655, 290),
+        (600, 315),(540, 330),(475, 338),(410, 340),(345, 336),
+        (282, 326),(222, 310),(168, 288),(122, 262),(86,  232),
+        (62,  198),(50,  162),(50,  126),(62,   96),(60,   70),
     ]
+ 
+    # Queens — large irregular blob
     queens = [
-        (50,195),(68,155),(94,115),(128,80),(170,50),(216,28),
-        (266,12),(320,4),(376,2),(432,6),(486,18),(534,36),
-        (575,60),(606,88),(628,120),(638,154),(638,188),(628,220),
-        (608,248),(580,272),(546,290),(507,302),(465,308),(422,308),
-        (379,304),(337,296),(297,284),(260,270),(227,253),(198,234),
-        (175,214),(157,194),(144,175),(137,158),(92,172),(50,195),
+        (50, 200), (70, 155), (100, 112),(140, 74), (188, 44),
+        (242, 22), (300, 8),  (362, 2),  (426, 4),  (488, 14),
+        (546, 32), (596, 58), (636, 90), (662, 128),(674, 168),
+        (672, 208),(656, 246),(628, 278),(590, 304),(544, 322),
+        (494, 334),(442, 338),(390, 336),(338, 326),(290, 310),
+        (246, 288),(208, 262),(176, 232),(152, 200),(136, 168),
+        (92, 180), (50, 200),
     ]
+ 
+    # Bronx — top-heavy shape
     bronx = [
-        (120,360),(132,320),(150,278),(176,240),(208,206),(246,176),
-        (288,150),(332,128),(378,112),(426,100),(474,94),(520,92),
-        (562,96),(598,106),(626,120),(646,140),(654,162),(652,184),
-        (640,204),(620,220),(594,232),(562,240),(528,244),(493,244),
-        (458,242),(424,238),(391,232),(360,228),(332,226),(307,228),
-        (285,234),(266,244),(250,258),(238,276),(229,298),(224,322),
-        (222,348),(222,364),(170,366),(120,360),
+        (100, 380),(112, 335),(132, 290),(160, 248),(196, 210),
+        (238, 176),(284, 148),(334, 126),(386, 110),(440,  98),
+        (494,  92),(546,  90),(594,  94),(636, 104),(668, 120),
+        (690, 140),(700, 164),(698, 188),(684, 210),(660, 228),
+        (628, 242),(590, 252),(550, 256),(510, 256),(470, 252),
+        (432, 246),(396, 238),(362, 230),(330, 224),(300, 222),
+        (272, 224),(248, 230),(228, 240),(212, 254),(200, 272),
+        (192, 294),(188, 318),(188, 342),(188, 368),(144, 374),
+        (100, 380),
     ]
+ 
+    # Staten Island — oval/teardrop
     staten = [
-        (240,72),(282,50),(326,36),(374,28),(422,28),(468,36),
-        (508,52),(540,74),(564,102),(576,132),(578,163),(570,194),
-        (552,222),(526,246),(494,264),(458,276),(420,282),(381,282),
-        (342,276),(306,264),(274,247),(248,226),(228,202),(216,176),
-        (212,149),(216,122),(228,98),(248,78),(240,72),
+        (240, 72), (286, 48), (336, 32), (390, 24), (444, 24),
+        (496, 34), (540, 54), (574, 82), (596, 116),(604, 152),
+        (600, 188),(582, 222),(554, 252),(518, 274),(476, 290),
+        (432, 298),(386, 298),(340, 290),(298, 274),(262, 252),
+        (232, 224),(212, 192),(202, 158),(202, 124),(214, 92),
+        (240, 72),
     ]
-    # "All" uses a wide rectangle — no shape restriction
+ 
+    # All NYC — full canvas rectangle
     all_nyc = [(20, 20), (780, 20), (780, 480), (20, 480)]
  
     return {
-        "All Manhattan":  _make_mask([all_nyc]),
-        "Manhattan":      _make_mask([manhattan]),
-        "Brooklyn":       _make_mask([brooklyn]),
-        "Queens":         _make_mask([queens]),
-        "Bronx":          _make_mask([bronx]),
-        "Staten Island":  _make_mask([staten]),
+        "All Manhattan": _make_mask([all_nyc]),
+        "Manhattan":     _make_mask([manhattan]),
+        "Brooklyn":      _make_mask([brooklyn]),
+        "Queens":        _make_mask([queens]),
+        "Bronx":         _make_mask([bronx]),
+        "Staten Island": _make_mask([staten]),
     }
  
-####### ####### ####### ####### ####### ####### ####### 
-####### DATA
-
+ 
+# ─────────────────────────────────────────────
+# DATA LOADING
+# ─────────────────────────────────────────────
 @st.cache_data(show_spinner="Loading 311 data...")
 def get_data():
     df = load_data()
@@ -106,15 +122,14 @@ def get_data():
     df = df.dropna(subset=["Created Date"])
     return df
  
-df       = get_data()
-masks    = build_masks()
  
-
-
-
-####### ####### ####### ####### ####### ####### ####### 
-####### SIDEBAR FILTERS  (mirrors Map_311.py exactly)
-
+df    = get_data()
+masks = build_masks()
+ 
+ 
+# ─────────────────────────────────────────────
+# SIDEBAR FILTERS
+# ─────────────────────────────────────────────
 st.sidebar.header("Filter Manhattan Data")
  
 hoods = ["All Manhattan"] + sorted(df["Neighborhood"].dropna().unique().astype(str))
@@ -124,26 +139,37 @@ groups = ["All Categories"] + sorted(df["Complaint_Group"].dropna().unique().ast
 selected_group = st.sidebar.selectbox("Complaint Category", groups)
  
 if selected_group != "All Categories":
-    relevant = df[df["Complaint_Group"] == selected_group]["Complaint"].dropna().unique()
-    issues   = ["All in Category"] + sorted(relevant.astype(str))
+    relevant       = df[df["Complaint_Group"] == selected_group]["Complaint"].dropna().unique()
+    issues         = ["All in Category"] + sorted(relevant.astype(str))
     selected_issue = st.sidebar.selectbox("Specific Issue", issues)
 else:
     selected_issue = "All in Category"
  
-# Borough selector — drives the silhouette shape
 st.sidebar.divider()
-borough_options = ["All Manhattan", "Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"]
-selected_borough = st.sidebar.selectbox("Borough shape", borough_options)
-
-
-
-
-
-
-
-####### ####### ####### ####### ####### ####### ####### 
-####### APPLY FILTERS
-
+ 
+# Borough shape selector
+borough_options  = ["All Manhattan", "Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"]
+selected_borough = st.sidebar.selectbox("☁️ Word Cloud Shape", borough_options)
+ 
+# Color theme selector
+colormap_options = {
+    "Red–Yellow–Blue": "RdYlBu",
+    "NYC Subway (Spectral)": "Spectral",
+    "Cool Blues": "Blues",
+    "Warm Reds": "Reds",
+    "Viridis": "viridis",
+    "Plasma": "plasma",
+}
+selected_colormap_label = st.sidebar.selectbox("Color Theme", list(colormap_options.keys()))
+selected_colormap        = colormap_options[selected_colormap_label]
+ 
+# Max words slider
+max_words = st.sidebar.slider("Max Words", min_value=20, max_value=200, value=100, step=10)
+ 
+ 
+# ─────────────────────────────────────────────
+# APPLY FILTERS
+# ─────────────────────────────────────────────
 filtered = df.copy()
  
 if selected_hood != "All Manhattan":
@@ -153,18 +179,21 @@ if selected_group != "All Categories":
 if selected_issue != "All in Category":
     filtered = filtered[filtered["Complaint"] == selected_issue]
  
-
-
-
-
-
-
-####### ####### ####### ####### ####### ####### ####### 
-####### PAGE
-
-st.title("☁️ NYC 311 Complaint Word Cloud")
-st.markdown(f"Displaying **{len(filtered):,}** reports — shaped as **{selected_borough}**")
  
+# ─────────────────────────────────────────────
+# PAGE HEADER
+# ─────────────────────────────────────────────
+st.title("☁️ NYC 311 Complaint Word Cloud")
+st.markdown(
+    f"Displaying **{len(filtered):,}** reports — "
+    f"shaped as **{selected_borough}** · "
+    f"color theme: **{selected_colormap_label}**"
+)
+ 
+ 
+# ─────────────────────────────────────────────
+# WORD CLOUD
+# ─────────────────────────────────────────────
 if filtered.empty:
     st.warning("No complaints match the current filters. Try broadening your selection.")
 else:
@@ -174,8 +203,8 @@ else:
     wc = WordCloud(
         mask=mask,
         background_color="white",
-        colormap="RdYlBu",
-        max_words=100,
+        colormap=selected_colormap,
+        max_words=max_words,
         prefer_horizontal=0.78,
         contour_width=3,
         contour_color="#1a1a2e",
@@ -192,13 +221,41 @@ else:
     st.pyplot(fig, use_container_width=True)
     plt.close(fig)
  
-####### ####### ####### ####### ####### ####### ####### 
-####### METRICS  (from Map_311.py)
-
+    # Download button
+    from io import BytesIO
+    buf = BytesIO()
+    wc_img = wc.to_image()
+    wc_img.save(buf, format="PNG")
+    st.download_button(
+        label="⬇️ Download Word Cloud",
+        data=buf.getvalue(),
+        file_name=f"wordcloud_{selected_borough.replace(' ', '_')}.png",
+        mime="image/png",
+    )
+ 
+ 
+# ─────────────────────────────────────────────
+# METRICS
+# ─────────────────────────────────────────────
 if not filtered.empty:
     st.markdown("---")
     col1, col2, col3 = st.columns(3)
     col1.metric("Hotspot Neighborhood", filtered["Neighborhood"].value_counts().idxmax())
-    col2.metric("Total Reports", f"{len(filtered):,}")
-    col3.metric("Top Complaint", filtered["Complaint"].value_counts().idxmax())
+    col2.metric("Total Reports",        f"{len(filtered):,}")
+    col3.metric("Top Complaint",        filtered["Complaint"].value_counts().idxmax())
+ 
+ 
+# ─────────────────────────────────────────────
+# TOP COMPLAINTS TABLE
+# ─────────────────────────────────────────────
+if not filtered.empty:
+    st.markdown("### 📋 Top 10 Complaints")
+    top10 = (
+        filtered["Complaint"]
+        .value_counts()
+        .head(10)
+        .reset_index()
+    )
+    top10.columns = ["Complaint", "Count"]
+    st.dataframe(top10, use_container_width=True, hide_index=True)
  
