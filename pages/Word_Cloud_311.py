@@ -4,6 +4,12 @@ Word_Cloud_311.py
 NYC 311 Dashboard - Word Cloud Page
 I Love NY logo with complaint words filling the red heart.
 """
+# -*- coding: utf-8 -*-
+"""
+Word_Cloud_311.py
+NYC 311 Dashboard - Word Cloud Page
+I Love NY logo — exact original proportions, black words in red heart.
+"""
 
 import math
 from io import BytesIO
@@ -18,19 +24,35 @@ from data_loader import load_data
 
 st.set_page_config(page_title="NYC 311 Word Cloud", layout="wide")
 
-# Slab serif font — closest available to American Typewriter
 FONT_PATH = "/usr/share/fonts/truetype/freefont/FreeSerifBold.ttf"
 
-# Fixed layout constants — DO NOT auto-scale these
-HEART_SIZE = 500   # px — heart width & height
-FONT_SIZE  = 260   # px — I and NY cap height
+# ── Canvas based on original logo scaled 4x ─────────────────────────
+# Original logo: 414x122px
+# I:     x=11..65,   y=21..113
+# Heart: x=73..180,  y=21..115
+# NY:    x=192..403, y=21..113
+SCALE      = 4
+CANVAS_W   = 414 * SCALE          # 1656
+CANVAS_H   = 122 * SCALE          # 488
+I_CX       = 38  * SCALE          # 152  — center x of "I"
+HEART_LX   = 73  * SCALE          # 292  — heart left x
+HEART_RX   = 180 * SCALE          # 720  — heart right x
+HEART_TY   = 21  * SCALE          # 84   — heart top y
+HEART_BY   = 115 * SCALE          # 460  — heart bottom y
+NY_CX      = 298 * SCALE          # 1192 — center x of "NY"
+TEXT_TY    = 21  * SCALE          # 84   — text top y
+TEXT_BY    = 113 * SCALE          # 452  — text bottom y
+
+HEART_W    = HEART_RX - HEART_LX  # 428
+HEART_H    = HEART_BY - HEART_TY  # 376
+TEXT_H     = TEXT_BY  - TEXT_TY   # 368
 
 
 # ─────────────────────────────────────────────
-# HEART WORD CLOUD
+# HEART WORD CLOUD — red bg, black words
 # ─────────────────────────────────────────────
-def build_heart_wordcloud(freq, max_words=80):
-    size = 800
+def build_heart_wc(freq, max_words=60):
+    size = 700
     W = H = size
     mask_img = Image.new("L", (W, H), 255)
     draw = ImageDraw.Draw(mask_img)
@@ -56,12 +78,12 @@ def build_heart_wordcloud(freq, max_words=80):
     wc = WordCloud(
         mask=rgb_mask,
         background_color="red",
-        color_func=lambda *a, **k: "white",
+        color_func=lambda *a, **k: "black",
         max_words=max_words,
-        prefer_horizontal=0.75,
+        prefer_horizontal=0.80,
         contour_width=0,
-        min_font_size=8,
-        max_font_size=70,
+        min_font_size=7,
+        max_font_size=55,
         collocations=False,
         relative_scaling=0.5,
     ).generate_from_frequencies(freq)
@@ -74,16 +96,20 @@ def build_heart_wordcloud(freq, max_words=80):
 
 
 # ─────────────────────────────────────────────
-# RENDER TEXT WITH PIL
+# RENDER LETTER — auto-sizes to exact height
 # ─────────────────────────────────────────────
-def render_text(text, font_size):
-    try:
-        font = ImageFont.truetype(FONT_PATH, font_size)
-    except Exception:
-        font = ImageFont.load_default()
-    dummy = Image.new("RGBA", (1, 1))
-    bbox = ImageDraw.Draw(dummy).textbbox((0, 0), text, font=font)
-    pad = 8
+def render_letter(text, target_height):
+    for fs in range(600, 50, -2):
+        try:
+            font = ImageFont.truetype(FONT_PATH, fs)
+        except Exception:
+            font = ImageFont.load_default()
+            break
+        dummy = Image.new("RGBA", (1, 1))
+        bbox = ImageDraw.Draw(dummy).textbbox((0, 0), text, font=font)
+        if (bbox[3] - bbox[1]) <= target_height:
+            break
+    pad = 6
     w = bbox[2] - bbox[0] + pad * 2
     h = bbox[3] - bbox[1] + pad * 2
     img = Image.new("RGBA", (w, h), (255, 255, 255, 0))
@@ -95,37 +121,32 @@ def render_text(text, font_size):
 
 
 # ─────────────────────────────────────────────
-# COMPOSE FULL I ♥ NY LOGO
+# COMPOSE FULL LOGO
 # ─────────────────────────────────────────────
 def compose_logo(heart_img):
-    i_img  = render_text("I",  FONT_SIZE)
-    ny_img = render_text("NY", FONT_SIZE)
+    i_img  = render_letter("I",  TEXT_H)
+    ny_img = render_letter("NY", TEXT_H)
 
-    GAP    = 40
-    LOGO_H = HEART_SIZE + 80
-    LOGO_W = i_img.width + GAP + HEART_SIZE + GAP + ny_img.width
+    canvas = Image.new("RGBA", (CANVAS_W, CANVAS_H), (255, 255, 255, 255))
 
-    canvas = Image.new("RGBA", (LOGO_W, LOGO_H), (255, 255, 255, 255))
+    # Heart
+    h_res = heart_img.resize((HEART_W, HEART_H), Image.LANCZOS)
+    canvas.paste(h_res, (HEART_LX, HEART_TY), h_res)
 
-    # Heart — centered vertically
-    h_res = heart_img.resize((HEART_SIZE, HEART_SIZE), Image.LANCZOS)
-    hx = i_img.width + GAP
-    hy = (LOGO_H - HEART_SIZE) // 2
-    canvas.paste(h_res, (hx, hy), h_res)
+    # "I" — centered in its zone
+    i_x = I_CX - i_img.width // 2
+    i_y = (CANVAS_H - i_img.height) // 2
+    canvas.paste(i_img, (i_x, i_y), i_img)
 
-    # "I" — centered vertically
-    iy = (LOGO_H - i_img.height) // 2
-    canvas.paste(i_img, (0, iy), i_img)
-
-    # "NY" — centered vertically
-    nx = i_img.width + GAP + HEART_SIZE + GAP
-    ny = (LOGO_H - ny_img.height) // 2
-    canvas.paste(ny_img, (nx, ny), ny_img)
+    # "NY" — centered in its zone
+    ny_x = NY_CX - ny_img.width // 2
+    ny_y = (CANVAS_H - ny_img.height) // 2
+    canvas.paste(ny_img, (ny_x, ny_y), ny_img)
 
     result = canvas.convert("RGB")
 
     fig, ax = plt.subplots(
-        figsize=(LOGO_W / 100, LOGO_H / 100), facecolor="white"
+        figsize=(CANVAS_W / 120, CANVAS_H / 120), facecolor="white"
     )
     ax.imshow(np.array(result))
     ax.axis("off")
@@ -172,7 +193,7 @@ else:
     selected_issue = "All in Category"
 
 st.sidebar.divider()
-max_words = st.sidebar.slider("Max Words in Heart", min_value=20, max_value=150, value=80, step=10)
+max_words = st.sidebar.slider("Max Words in Heart", min_value=20, max_value=120, value=60, step=10)
 
 
 # ─────────────────────────────────────────────
@@ -203,7 +224,7 @@ else:
     freq = filtered["Complaint"].value_counts().to_dict()
 
     with st.spinner("Generating word cloud..."):
-        heart_img, wc_obj = build_heart_wordcloud(freq, max_words=max_words)
+        heart_img, wc_obj = build_heart_wc(freq, max_words=max_words)
         fig, result_img = compose_logo(heart_img)
 
     st.pyplot(fig, use_container_width=True)
